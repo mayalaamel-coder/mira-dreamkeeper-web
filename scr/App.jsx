@@ -107,6 +107,74 @@ function App() {
   const [fireplaceVolume, setFireplaceVolume] = useState(40);
   const [sleepStage, setSleepStage] = useState(0);
 
+  // --- AUDIO REFS (TEMPAT KITA MEMASUKKAN JALUR SUARA) ---
+  // Kita menggunakan useRef untuk menyimpan objek Audio agar tidak hilang saat re-render
+  const rainAudioRef = useRef(new Audio('./assets/sounds/rain.wav'));
+  const fireplaceAudioRef = useRef(new Audio('./assets/sounds/fire.wav'));
+
+  // --- EFFECT 1: SETUP VOLUME DAN LOOP ---
+  useEffect(() => {
+    const rainAudio = rainAudioRef.current;
+    const fireAudio = fireplaceAudioRef.current;
+    
+    // Set loop agar suara berulang terus
+    rainAudio.loop = true;
+    fireAudio.loop = true;
+
+    // Set volume awal
+    rainAudio.volume = rainVolume / 100;
+    fireAudio.volume = fireplaceVolume / 100;
+
+    // Cleanup: Stop audio ketika komponen dibongkar
+    return () => {
+      rainAudio.pause();
+      fireAudio.pause();
+    };
+  }, []); // Hanya dijalankan sekali saat mount
+
+  // --- EFFECT 2: KONTROL VOLUME SUARA ---
+  useEffect(() => {
+    rainAudioRef.current.volume = rainVolume / 100;
+  }, [rainVolume]);
+
+  useEffect(() => {
+    fireplaceAudioRef.current.volume = fireplaceVolume / 100;
+  }, [fireplaceVolume]);
+
+
+  // --- EFFECT 3: KONTROL SUARA HUJAN ---
+  useEffect(() => {
+    const rainAudio = rainAudioRef.current;
+    
+    if (soundEnabled && ambientRain) {
+      // PLAY: Coba putar suara. Browser mungkin memblokir ini.
+      rainAudio.play().catch(error => {
+        console.error("Gagal memutar hujan (Mungkin diblokir oleh Autoplay Policy):", error);
+      });
+    } else {
+      // PAUSE: Hentikan suara
+      rainAudio.pause();
+    }
+  }, [soundEnabled, ambientRain]);
+
+
+  // --- EFFECT 4: KONTROL SUARA API ---
+  useEffect(() => {
+    const fireAudio = fireplaceAudioRef.current;
+    
+    if (soundEnabled && ambientFireplace) {
+      // PLAY: Coba putar suara. Browser mungkin memblokir ini.
+      fireAudio.play().catch(error => {
+        console.error("Gagal memutar api (Mungkin diblokir oleh Autoplay Policy):", error);
+      });
+    } else {
+      // PAUSE: Hentikan suara
+      fireAudio.pause();
+    }
+  }, [soundEnabled, ambientFireplace]);
+
+
+  // --- LOGIC LAINNYA (TIDAK ADA PERUBAHAN) ---
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -368,3 +436,4 @@ function App() {
 }
 
 export default App;
+
