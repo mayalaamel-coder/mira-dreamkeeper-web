@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starlight Sleepover — Interactive Demo</title>
+    <style>
+        :root{
+            --bg1:#071226;
+            --bg2:#061428;
+            --panel: rgba(255,255,255,0.04);
+            --muted: #dfefffcc;
+        }
+        *{box-sizing:border-box}
+        body{
+            margin:0;
+            font-family:Inter,system-ui,Arial;
+            background:linear-gradient(180deg,var(--bg1),var(--bg2));
+            color:var(--muted);
+            min-height:100vh;
+        }
+        .topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 28px}
+        .layout{display:grid;grid-template-columns:2fr 1fr;gap:18px;max-width:1200px;margin:18px auto;padding:0 18px}
+        .hero{display:flex;gap:16px;background:var(--panel);padding:18px;border-radius:14px;align-items:flex-start}
+        .hero-left{flex:1}
+        .hero-right{width:320px;position:relative}
+        .hero-img{width:100%;height:420px;object-fit:cover;border-radius:12px;box-shadow:0 10px 36px rgba(0,0,0,0.6)}
+        .thumbnails img{width:68px;height:68px;border-radius:10px;object-fit:cover;margin-right:8px;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
+        .lights-overlay{position:absolute;inset:0;pointer-events:none}
+        .light-btn{position:absolute;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:auto;border:0;background:transparent;padding:0;cursor:pointer}
+        .light-on{display:block;width:100%;height:100%;border-radius:50%;box-shadow:0 0 12px 4px rgba(255,215,0,0.8), 0 0 24px 8px rgba(255,215,0,0.4)}
+        .light-off{display:block;width:100%;height:100%;border-radius:50%;background:rgba(255,255,255,0.06)}
+        .particle-canvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+        .sidebar{display:flex;flex-direction:column;gap:12px}
+        .widget{background:var(--panel);padding:16px;border-radius:12px}
+        .widget h3{margin:0 0 12px 0;font-size:16px;color:var(--muted);display:flex;align-items:center}
+        .clock{font-family:'JetBrains Mono',monospace;font-size:32px;text-align:center;margin:8px 0}
+        .time-input{display:flex;gap:8px;align-items:center;margin:8px 0}
+        .time-input input{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:8px;color:var(--muted);width:60px;text-align:center}
+        .sleep-btn{width:100%;padding:12px;background:#4a9eff;border:none;border-radius:10px;color:white;font-weight:600;cursor:pointer;margin-top:8px;transition:all 0.3s ease;display:flex;align-items:center;justify-content:center;gap:8px}
+        .sleep-btn:hover{background:#3a8eef;transform:translateY(-1px)}
+        .sleep-btn:active{transform:translateY(0)}
+        .sleep-btn.sleeping{background:#ef4444}
+        .quick-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+        .stat{background:rgba(255,255,255,0.02);padding:12px;border-radius:8px;text-align:center}
+        .stat-value{font-size:18px;font-weight:600;color:#4a9eff}
+        .stat-label{font-size:12px;color:var(--muted);margin-top:4px}
+        .sound-controls{display:flex;gap:8px;margin:12px 0}
+        .sound-btn{flex:1;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--muted);cursor:pointer;transition:all 0.2s ease;display:flex;flex-direction:column;align-items:center;gap:4px}
+        .sound-btn:hover{background:rgba(255,255,255,0.1)}
+        .sound-btn.active{background:#4a9eff;border-color:#4a9eff;color:white}
+        .sleep-stage{display:flex;flex-direction:column;align-items:center;padding:16px}
+        .stage-indicator{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#4a9eff,#6bb3ff);display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+        .stage-text{font-size:14px;color:var(--muted);text-align:center}
+        .breath-circle{width:40px;height:40px;border-radius:50%;border:2px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;animation:breath 4s ease-in-out infinite}
+        .breath-dot{width:8px;height:8px;border-radius:50%;background:white}
+        @keyframes breath {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+        .ambient-controls{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+        .ambient-item{display:flex;align-items:center;justify-content:space-between}
+        .ambient-label{font-size:14px;color:var(--muted)}
+        .ambient-slider{width:60px;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;position:relative;margin-left:8px}
+        .ambient-slider-fill{height:100%;background:#4a9eff;border-radius:2px;transition:width 0.3s ease}
+        .ambient-toggle{width:40px;height:20px;background:rgba(255,255,255,0.1);border-radius:10px;position:relative;cursor:pointer;transition:background 0.3s ease}
+        .ambient-toggle.active{background:#4a9eff}
+        .ambient-toggle-dot{width:16px;height:16px;background:white;border-radius:50%;position:absolute;top:2px;transition:left 0.3s ease}
+        .ambient-toggle.active .ambient-toggle-dot{left:22px}
+        .ambient-toggle:not(.active) .ambient-toggle-dot{left:2px}
+        .fade-in{animation:fadeIn 0.5s ease-in}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        .icon{margin-right:8px}
+        @media (max-width: 768px){
+            .layout{grid-template-columns:1fr;gap:12px;margin:12px auto}
+            .hero{flex-direction:column}
+            .hero-right{width:100%}
+            .topbar{padding:12px 16px}
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div style="display:flex;align-items:center;gap:12px">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="icon">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <h1 style="margin:0;font-size:20px">Starlight Sleepover</h1>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;font-size:14px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            <span id="active-lights">3 lights active</span>
+        </div>
+    </div>
+
+    <div class="layout">
+        <div class="hero">
+            <div class="hero-left">
+                <div style="margin-bottom:16px">
+                    <h2 style="margin:0 0 8px 0;font-size:18px">Tonight's Sleep Space</h2>
+                    <p style="margin:0;font-size:14px;opacity:0.7">
+                        Create your perfect stargazing environment
+                    </p>
+                </div>
+                
+                <div class="hero-right" style="position:relative">
+                    <img 
+                        src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&h=400&fit=crop&crop=center"
+                        alt="Starry night sky"
+                        class="hero-img"
+                        onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22600%22 height=%22400%22><rect width=%22100%25%22 height=%22100%25%22 fill=%22%23071226%22/><text x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23dfefffcc%22>Starry Night Sky</text></svg>'"
+                    />
+                    
+                    <div class="lights-overlay" id="lights-overlay">
+                        <!-- Lights will be generated by JavaScript -->
+                    </div>
+                    
+                    <canvas class="particle-canvas" id="particle-canvas"></canvas>
+                </div>
+                
+                <div class="thumbnails" style="display:flex;margin-top:12px">
+                    <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=68&h=68&fit=crop&crop=center" alt="Scene 1" onerror="this.style.display='none'">
+                    <img src="https://images.unsplash.com/photo-1490324412500-8d7e85eab80c?w=68&h=68&fit=crop&crop=center" alt="Scene 2" onerror="this.style.display='none'">
+                    <img src="https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=68&h=68&fit=crop&crop=center" alt="Scene 3" onerror="this.style.display='none'">
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="widget">
+                    <h3>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="icon">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12,6 12,12 16,14"/>
+                        </svg>
+                        Current Time
+                    </h3>
+                    <div class="clock" id="current-time">--:--:-- --</div>
+                    <div style="text-align:center;font-size:14px;opacity:0.7" id="current-date">
+                        Monday, November 21, 2025
+                    </div>
+                    
+                    <div class="time-input">
+                        <label style="font-size:14px">Wake up at:</label>
+                        <input type="time" value="07:00" id="wake-time">
+                    </div>
+                </div>
+
+                <div class="widget">
+                    <h3>Sleep Tracker</h3>
+                    <div class="quick-stats">
+                        <div class="stat">
+                            <div class="stat-value">7.2h</div>
+                            <div class="stat-label">Last Night</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">85%</div>
+                            <div class="stat-label">Sleep Quality</div>
+                        </div>
+                    </div>
+                    
+                    <button class="sleep-btn" id="sleep-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                        Start Sleep Mode
+                    </button>
+                </div>
+
+                <div class="widget" id="sleep-stage-widget" style="display:none">
+                    <h3>Sleep Stage</h3>
+                    <div class="sleep-stage">
+                        <div class="stage-indicator">
+                            <div class="breath-circle">
+                                <div class="breath-dot"></div>
+                            </div>
+                        </div>
+                        <div class="stage-text" id="sleep-stage-text">
+                            Falling Asleep
+                        </div>
+                    </div>
+                </div>
+
+                <div class="widget">
+                    <h3>Ambient Sounds</h3>
+                    <div class="sound-controls">
+                        <button class="sound-btn" id="sound-toggle">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="sound-icon">
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                            </svg>
+                            <div style="font-size:12px;margin-top:4px" id="sound-status">Off</div>
+                        </button>
+                    </div>
+                    
+                    <div class="ambient-controls" id="ambient-controls" style="display:none">
+                        <div class="ambient-item">
+                            <div class="ambient-label">Rain</div>
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <div class="ambient-toggle" id="rain-toggle">
+                                    <div class="ambient-toggle-dot"></div>
+                                </div>
+                                <input type="range" min="0" max="100" value="60" class="ambient-slider" id="rain-volume">
+                            </div>
+                        </div>
+                        
+                        <div class="ambient-item">
+                            <div class="ambient-label">Fireplace</div>
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <div class="ambient-toggle active" id="fireplace-toggle">
+                                    <div class="ambient-toggle-dot"></div>
+                                </div>
+                                <input type="range" min="0" max="100" value="40" class="ambient-slider" id="fireplace-volume">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let currentTime = new Date();
+        let activeLights = 3;
+        let isSleeping = false;
+        let soundEnabled = false;
+        let ambientRain = false;
+        let ambientFireplace = true;
+        let sleepStage = 0;
+        
+        const lights = [
+            { id: 1, x: 20, y: 25, on: true },
+            { id: 2, x: 70, y: 15, on: true },
+            { id: 3, x: 45, y: 40, on: true },
+            { id: 4, x: 15, y: 70, on: false },
+            { id: 5, x: 80, y: 60, on: false },
+            { id: 6, x: 60, y: 85, on: false }
+        ];
+        
+        const sleepStages = ['Falling Asleep', 'Light Sleep', 'Deep Sleep', 'REM Sleep'];
+        
+        // Initialize lights
+        function initLights() {
+            const overlay = document.getElementById('lights-overlay');
+            overlay.innerHTML = '';
+            
+            lights.forEach(light => {
+                const btn = document.createElement('button');
+                btn.className = 'light-btn';
+                btn.style.left = light.x + '%';
+                btn.style.top = light.y + '%';
+                btn.onclick = () => toggleLight(light.id);
+                
+                const lightDiv = document.createElement('div');
+                lightDiv.className = light.on ? 'light-on' : 'light-off';
+                btn.appendChild(lightDiv);
+                
+                overlay.appendChild(btn);
+            });
+        }
+        
+        function toggleLight(id) {
+            const light = lights.find(l => l.id === id);
+            light.on = !light.on;
+            initLights();
+            updateActiveLightsCount();
+        }
+        
+        function updateActiveLightsCount() {
+            activeLights = lights.filter(l => l.on).length;
+            document.getElementById('active-lights').textContent = `${activeLights} lights active`;
+        }
+        
+        // Time management
+        function updateTime() {
+            currentTime = new Date();
+            const timeStr = currentTime.toLocaleTimeString('en-US', { 
+                hour12: true, 
+                hour: 'numeric', 
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('current-time').textContent = timeStr;
+            
+            const dateStr = currentTime.toLocaleDateString('en-US', { 
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric'
+            });
+            document.getElementById('current-date').textContent = dateStr;
+        }
+        
+        // Sleep mode
+        function toggleSleep() {
+            isSleeping = !isSleeping;
+            const btn = document.getElementById('sleep-btn');
+            const stageWidget = document.getElementById('sleep-stage-widget');
+            
+            if (isSleeping) {
+                btn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="4" width="4" height="16"/>
+                        <rect x="14" y="4" width="4" height="16"/>
+                    </svg>
+                    Wake Up`;
+                btn.classList.add('sleeping');
+                stageWidget.style.display = 'block';
+                stageWidget.classList.add('fade-in');
+                
+                // Start sleep stage cycling
+                startSleepStages();
+            } else {
+                btn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                    Start Sleep Mode`;
+                btn.classList.remove('sleeping');
+                stageWidget.style.display = 'none';
+                
+                // Stop sleep stages
+                clearInterval(sleepStageInterval);
+            }
+        }
+        
+        let sleepStageInterval;
+        function startSleepStages() {
+            sleepStage = 0;
+            document.getElementById('sleep-stage-text').textContent = sleepStages[sleepStage];
+            
+            sleepStageInterval = setInterval(() => {
+                sleepStage = (sleepStage + 1) % sleepStages.length;
+                document.getElementById('sleep-stage-text').textContent = sleepStages[sleepStage];
+            }, 3000);
+        }
+        
+        // Sound controls
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('sound-toggle');
+            const controls = document.getElementById('ambient-controls');
+            const status = document.getElementById('sound-status');
+            const icon = document.getElementById('sound-icon');
+            
+            if (soundEnabled) {
+                btn.classList.add('active');
+                controls.style.display = 'flex';
+                controls.classList.add('fade-in');
+                status.textContent = 'On';
+                icon.innerHTML = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>';
+            } else {
+                btn.classList.remove('active');
+                controls.style.display = 'none';
+                status.textContent = 'Off';
+                icon.innerHTML = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>';
+            }
+        }
+        
+        // Ambient toggles
+        function toggleRain() {
+            ambientRain = !ambientRain;
+            document.getElementById('rain-toggle').classList.toggle('active', ambientRain);
+        }
+        
+        function toggleFireplace() {
+            ambientFireplace = !ambientFireplace;
+            document.getElementById('fireplace-toggle').classList.toggle('active', ambientFireplace);
+        }
+        
+        // Particle animation
+        function initParticles() {
+            const canvas = document.getElementById('particle-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            const particles = [];
+            const particleCount = 50;
+            
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2 + 0.5,
+                    speedX: (Math.random() - 0.5) * 0.5,
+                    speedY: (Math.random() - 0.5) * 0.5,
+                    opacity: Math.random() * 0.8 + 0.2
+                });
+            }
+            
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                particles.forEach((particle, index) => {
+                    particle.x += particle.speedX;
+                    particle.y += particle.speedY;
+                    
+                    if (particle.x < 0 || particle.x > canvas.width) particle.speedX *= -1;
+                    if (particle.y < 0 || particle.y > canvas.height) particle.speedY *= -1;
+                    
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${particle.opacity})`;
+                    ctx.fill();
+                    
+                    for (let j = index + 1; j < particles.length; j++) {
+                        const dx = particle.x - particles[j].x;
+                        const dy = particle.y - particles[j].y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < 100) {
+                            ctx.beginPath();
+                            ctx.moveTo(particle.x, particle.y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 * (1 - distance / 100)})`;
+                            ctx.stroke();
+                        }
+                    }
+                });
+                
+                requestAnimationFrame(animate);
+            }
+            
+            animate();
+            
+            // Update particle opacity based on active lights
+            canvas.style.opacity = activeLights > 0 ? '1' : '0.3';
+        }
+        
+        // Event listeners
+        document.getElementById('sleep-btn').onclick = toggleSleep;
+        document.getElementById('sound-toggle').onclick = toggleSound;
+        document.getElementById('rain-toggle').onclick = toggleRain;
+        document.getElementById('fireplace-toggle').onclick = toggleFireplace;
+        
+        // Initialize everything
+        initLights();
+        initParticles();
+        updateTime();
+        updateActiveLightsCount();
+        
+        // Start time updates
+        setInterval(updateTime, 1000);
+        
+        // Handle window resize for particles
+        window.addEventListener('resize', () => {
+            const canvas = document.getElementById('particle-canvas');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        });
+    </script>
+</body>
+</html>
